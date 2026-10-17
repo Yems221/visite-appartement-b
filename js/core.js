@@ -20,6 +20,7 @@ export const U = {
   uBounds: { value: new THREE.Vector4() },
   uReveal: { value: Array.from({ length: NR }, () => new THREE.Vector4(0, 0, -1e4, 0)) },
   uOutside: { value: 0 },
+  uForceInk: { value: 0 }, // 1 = the whole model as a line drawing (Réseaux mode)
   uPaper: { value: raw(PAPER) },
   uInkCol: { value: raw(INK) },
   uSoft: { value: 1.2 },
@@ -32,6 +33,7 @@ uniform sampler2D uRoomMap;
 uniform vec4 uBounds;
 uniform vec4 uReveal[NR];
 uniform float uOutside;
+uniform float uForceInk;
 uniform vec3 uPaper;
 uniform vec3 uInkCol;
 uniform float uSoft;
@@ -44,6 +46,7 @@ int roomOf(vec3 q) {
 }
 // 1 = line drawing, 0 = material
 float inkOf(vec3 q) {
+  if (uForceInk > 0.5) return 1.0;
   int r = roomOf(q);
   if (r < 0) return 1.0 - uOutside;
   vec4 s = uReveal[r];

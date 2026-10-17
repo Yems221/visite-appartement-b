@@ -1,6 +1,7 @@
 // Pack Réseaux (demo): a FICTITIOUS set of services drawn into Appartement B.
 // Fixtures you would see on the walls (sockets, switches, panel, water heater) are part of
-// the normal visit. The pipes and cables appear only in X-ray mode, drawn over everything,
+// the normal visit. The pipes and cables appear only in Réseaux mode (the model is then a line
+// drawing): sharp where they are in view, faint where a wall or a piece of furniture hides them,
 // with numbered markers on the points to check. Data: data/reseaux.json (made by reseaux.py).
 
 import * as THREE from 'three';
@@ -29,6 +30,28 @@ function polyTube(pts, r) {
 
 function overlay(color, opacity = 1) {
   return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthTest: false, depthWrite: false, toneMapped: false });
+}
+// Sharp pass: depth-tested, but pulled PULL metres towards the eye so a cable inside the wall
+// (or a pipe in the screed) in front of you still shows. What runs behind another wall or a
+// piece of furniture fails the test and is left to the faint pass.
+export const PULL = { value: 0.35 };
+function pulled(color) {
+  const m = new THREE.MeshBasicMaterial({ color, depthTest: true, depthWrite: false, toneMapped: false });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uPull = PULL;
+    sh.vertexShader = 'uniform float uPull;\n' + sh.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    { float L = length(mvPosition.xyz); mvPosition.xyz *= max(L - uPull, min(L, 0.08)) / L; gl_Position = projectionMatrix * mvPosition; }`);
+  };
+  m.customProgramCacheKey = () => 'netpull';
+  return m;
+}
+const FAINT = 0.34;
+function twoPass(group, geo, color, order) {
+  const sharp = new THREE.Mesh(geo, pulled(color));
+  sharp.renderOrder = order; sharp.frustumCulled = false;
+  const faint = new THREE.Mesh(geo, overlay(color, FAINT));
+  faint.renderOrder = order - 10; faint.frustumCulled = false;
+  group.add(faint, sharp);
 }
 
 function numberSprite(n) {
@@ -90,9 +113,7 @@ export async function buildReseaux() {
   for (const r of R.runs) (byType[r.t] ??= []).push(...polyTube(r.pts, RADIUS[r.t]));
   const order = { evac: 20, ef: 21, ec: 22, elec: 23 };
   for (const [t, geos] of Object.entries(byType)) {
-    const m = new THREE.Mesh(mergeGeometries(geos.map((g) => { g.deleteAttribute('uv'); return g; })), overlay(NET_COLORS[t], 0.95));
-    m.renderOrder = order[t]; m.frustumCulled = false;
-    xray.add(m);
+    twoPass(xray, mergeGeometries(geos.map((g) => { g.deleteAttribute('uv'); return g; })), NET_COLORS[t], order[t]);
   }
   // markers on fixtures
   const marks = { elec: [], ef: [], ec: [], evac: [] };
@@ -103,8 +124,7 @@ export async function buildReseaux() {
   }
   for (const [t, geos] of Object.entries(marks)) {
     if (!geos.length) continue;
-    const m = new THREE.Mesh(mergeGeometries(geos), overlay(new THREE.Color(NET_COLORS[t]).multiplyScalar(0.8), 1));
-    m.renderOrder = 25; xray.add(m);
+    twoPass(xray, mergeGeometries(geos), new THREE.Color(NET_COLORS[t]).multiplyScalar(0.8), 25);
   }
   // points to check
   const alertSprites = R.alerts.map((a) => {

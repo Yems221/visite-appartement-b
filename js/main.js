@@ -128,7 +128,8 @@ flat.add(lines(C.edges, 1.15, INK));
 const furniture = await (await fetch('data/furniture.json')).json();
 const DECOR = await buildDecor(furniture);
 flat.add(DECOR.group);
-flat.add(lines(DECOR.edges, 0.8, INK));
+const decorLines = lines(DECOR.edges, 0.8, INK);
+flat.add(decorLines);
 // Pack Réseaux demo: sockets and switches on the walls, networks in X-ray mode
 const NET = await buildReseaux();
 flat.add(NET.fixtures);
@@ -211,7 +212,7 @@ function updateReveal() {
   });
   for (const L of labels) {
     const r = reveal[L.room];
-    L.mesh.material.opacity = r ? 1 - clamp01((clock - r.t0) * SPEED / 3) : 1;
+    L.mesh.material.opacity = r && !xray ? 1 - clamp01((clock - r.t0) * SPEED / 3) : 1;
     L.mesh.visible = L.mesh.material.opacity > 0.01;
   }
 }
@@ -294,13 +295,18 @@ const me = { x: DROP.x, z: 21.25, yaw: -0.42, pitch: 0 };
 let flight = null; // tween between walk and plan
 
 let inside = false;
+let xray = false; // Réseaux mode: the whole model back to a line drawing, services in colour
 function setInside(v) {
   if (v === inside) return;
   inside = v;
-  outside.visible = v; paper.visible = !v;
-  scene.background = v ? skyTex : paperCol;
-  scene.fog = v ? haze : null;
-  U.uOutside.value = v ? 1 : 0;
+  syncEnv();
+}
+function syncEnv() {
+  const o = inside && !xray;
+  outside.visible = o; paper.visible = !o;
+  scene.background = o ? skyTex : paperCol;
+  scene.fog = o ? haze : null;
+  U.uOutside.value = o ? 1 : 0;
   for (const m of lineMats) m.fog = false;
   renderer.shadowMap.needsUpdate = true;
 }
@@ -442,11 +448,10 @@ canvas.addEventListener('dblclick', (e) => {
   if (ray.ray.intersectPlane(floorPlane, hit) && hit.distanceTo(camera.position) < 25) goal = { x: hit.x, z: hit.z };
 });
 // ---------------------------------------------------------------------------
-// X-ray: walls turn to glass, the services show in colour, the points to check are numbered
+// Réseaux (X-ray): the model goes back to the plan drawing (black structure on paper,
+// furniture in light grey lines), the services show in colour, the points to check are numbered
 // ---------------------------------------------------------------------------
-let xray = false;
-const GHOST = [M.wall, M.ceiling, M.wood, M.alu, M.sill, M.steel];
-GHOST.forEach((m) => (m.userData.solid = { transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, backInk: m.userData.ink?.uBackInk.value ?? 0 }));
+const DECOR_GREY = new THREE.Color('#a29d93'), DECOR_INK = new THREE.Color(INK);
 const netPanel = $('net'), netList = $('netList'), netDetail = $('netDetail');
 const LEG = { elec: 'Électricité', ef: 'Eau froide', ec: 'Eau chaude', evac: 'Évacuations' };
 $('netLegend').innerHTML = Object.entries(LEG).map(([k, t]) => `<span><i style="background:#${NET_COLORS[k].toString(16).padStart(6, '0')}"></i>${t}</span>`).join('');
@@ -461,14 +466,9 @@ function showAlert(i) {
 function setXray(on) {
   xray = on;
   NET.xray.visible = on;
-  for (const m of GHOST) {
-    const s = m.userData.solid;
-    m.transparent = on ? true : s.transparent;
-    m.opacity = on ? 0.16 : s.opacity;
-    m.depthWrite = on ? false : s.depthWrite;
-    if (m.userData.ink) m.userData.ink.uBackInk.value = on ? 0 : s.backInk;
-    m.needsUpdate = true;
-  }
+  U.uForceInk.value = on ? 1 : 0;
+  decorLines.material.color.copy(on ? DECOR_GREY : DECOR_INK);
+  syncEnv();
   document.body.classList.toggle('xray', on);
   $('btnNet').setAttribute('aria-pressed', on ? 'true' : 'false');
   if (!on) showAlert(-1);
