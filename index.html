@@ -34,6 +34,37 @@
 
   #top { top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; justify-content: space-between; align-items: center; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
   #top .mark { background: rgba(241,238,230,.86); padding: 7px 11px; border-radius: 999px; backdrop-filter: blur(6px); }
+  #top .tools { display: flex; gap: 8px; }
+  #btnNet { opacity: 0; transition: opacity .4s; }
+  body[data-mode="walk"] #btnNet, body[data-mode="plan"] #btnNet { opacity: 1; }
+  #btnNet[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  #net { display: none; left: max(16px, env(safe-area-inset-left, 0px)); top: calc(64px + env(safe-area-inset-top, 0px)); width: 310px; max-height: calc(100% - 120px); overflow: auto;
+    background: rgba(241,238,230,.94); backdrop-filter: blur(6px); border-radius: 14px; padding: 14px 16px; font-size: 12px; line-height: 1.5; }
+  body.xray[data-mode="walk"] #net, body.xray[data-mode="plan"] #net { display: block; }
+  body.xray #help { display: none; }
+  .net__tag { margin: 0 0 10px; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .net__legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 12px; }
+  .net__legend span { display: flex; align-items: center; gap: 7px; }
+  .net__legend i { width: 18px; height: 4px; border-radius: 2px; display: inline-block; }
+  .net__h { margin: 0 0 6px; font-weight: 600; }
+  .net__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .net__list button { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; border: 1px solid rgba(23,23,26,.15); background: transparent; border-radius: 10px; padding: 7px 9px; color: var(--ink); font-size: 12px; }
+  .net__list button.on { border-color: #d93a2b; background: rgba(217,58,43,.07); }
+  .net__list b { flex: none; width: 22px; height: 22px; border-radius: 50%; background: #d93a2b; color: #fff; display: grid; place-items: center; font-size: 11px; }
+  .net__list span { display: flex; flex-direction: column; }
+  .net__list small { color: var(--muted); font-size: 10.5px; }
+  .net__detail { margin: 10px 0 0; padding: 9px 10px; border-left: 3px solid #d93a2b; background: rgba(217,58,43,.06); border-radius: 0 8px 8px 0; }
+  .net__fine { margin: 10px 0 0; font-size: 10.5px; color: var(--muted); }
+  .net__tag { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .net__fold { border: 0; background: none; color: var(--muted); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 0; }
+  #net.min .net__h, #net.min .net__list, #net.min .net__detail, #net.min .net__fine { display: none; }
+  #net.min .net__legend { margin-bottom: 0; }
+  @media (max-width: 760px) {
+    #net { left: 12px; right: 12px; width: auto; top: calc(58px + env(safe-area-inset-top, 0px)); max-height: 46%; padding: 10px 12px; font-size: 11.5px; }
+    .net__legend { grid-template-columns: 1fr 1fr; gap: 3px 10px; margin-bottom: 8px; font-size: 10.5px; }
+    #top .floor { display: none; }
+    .net__fine { display: none; }
+  }
   #btnPlan { opacity: 0; transition: opacity .4s; }
   body[data-mode="walk"] #btnPlan, body[data-mode="plan"] #btnPlan { opacity: 1; }
   body[data-mode="plan"] #btnPlan::after { content: " · reprendre"; }
@@ -78,8 +109,8 @@
 <script>document.documentElement.lang = 'fr'; document.body.dataset.mode = 'sheet';</script>
 
 <header id="top" class="ui">
-  <span class="mark">Appartement B · 6<sup>e</sup> étage</span>
-  <button id="btnPlan" class="btn ghost">Plan</button>
+  <span class="mark">Appartement B<span class="floor"> · 6<sup>e</sup> étage</span></span>
+  <span class="tools"><button id="btnNet" class="btn ghost" aria-pressed="false">Réseaux</button><button id="btnPlan" class="btn ghost">Plan</button></span>
 </header>
 
 <section id="hero" class="ui">
@@ -90,10 +121,19 @@
   <p class="credits">Matières : scans Poly Haven (CC0). Mobilier 3D : Khronos glTF Sample Assets, Eric Chadwick (CC BY 4.0) et Microsoft (CC0) ; Poly Haven (CC0). Œuvres du domaine public : F. Picabia, H. Matisse, Caravage, J. M. W. Turner.</p>
 </section>
 
+<aside id="net" class="ui" aria-label="Réseaux techniques">
+  <p class="net__tag">Réseau fictif · démonstration <button type="button" id="netFold" class="net__fold" aria-expanded="true">Réduire</button></p>
+  <div id="netLegend" class="net__legend"></div>
+  <p class="net__h">3 points à vérifier</p>
+  <ol id="netList" class="net__list"></ol>
+  <p id="netDetail" class="net__detail" hidden></p>
+  <p class="net__fine">Aide à la relecture, pas une validation technique : à faire confirmer par votre électricien et votre plombier.</p>
+</aside>
+
 <div id="room" class="ui"><div id="roomName"></div><div id="roomArea"></div></div>
 
 <div id="help" class="ui">
-  <span class="mouse">Glisser pour regarder<br>ZQSD / WASD ou flèches pour marcher<br>Double-clic : aller à cet endroit · P : plan</span>
+  <span class="mouse">Glisser pour regarder<br>ZQSD / WASD ou flèches pour marcher<br>Double-clic : aller à cet endroit · P : plan · R : réseaux</span>
   <span class="touch">Glisser pour regarder<br>Joystick gauche : marcher · droit : regarder</span>
 </div>
 

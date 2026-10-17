@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { buildDecor, artReady, fetchBinary } from './decor.js';
+import { buildReseaux, NET_COLORS } from './reseaux.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
@@ -128,6 +129,10 @@ const furniture = await (await fetch('data/furniture.json')).json();
 const DECOR = await buildDecor(furniture);
 flat.add(DECOR.group);
 flat.add(lines(DECOR.edges, 0.8, INK));
+// Pack Réseaux demo: sockets and switches on the walls, networks in X-ray mode
+const NET = await buildReseaux();
+flat.add(NET.fixtures);
+scene.add(NET.xray);
 
 // room names and areas, written on the floor like a plan
 const labels = [];
@@ -436,6 +441,55 @@ canvas.addEventListener('dblclick', (e) => {
   ray.setFromCamera(new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera);
   if (ray.ray.intersectPlane(floorPlane, hit) && hit.distanceTo(camera.position) < 25) goal = { x: hit.x, z: hit.z };
 });
+// ---------------------------------------------------------------------------
+// X-ray: walls turn to glass, the services show in colour, the points to check are numbered
+// ---------------------------------------------------------------------------
+let xray = false;
+const GHOST = [M.wall, M.ceiling, M.wood, M.alu, M.sill, M.steel];
+GHOST.forEach((m) => (m.userData.solid = { transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite, backInk: m.userData.ink?.uBackInk.value ?? 0 }));
+const netPanel = $('net'), netList = $('netList'), netDetail = $('netDetail');
+const LEG = { elec: 'Électricité', ef: 'Eau froide', ec: 'Eau chaude', evac: 'Évacuations' };
+$('netLegend').innerHTML = Object.entries(LEG).map(([k, t]) => `<span><i style="background:#${NET_COLORS[k].toString(16).padStart(6, '0')}"></i>${t}</span>`).join('');
+netList.innerHTML = NET.alerts.map((a, i) => `<li><button type="button" data-i="${i}"><b>${a.id}</b><span>${a.title}<small>${a.room === 'CHAMBRE 1' ? 'Chambre 1' : a.room === 'CHAMBRE 2' ? 'Chambre 2' : a.room}</small></span></button></li>`).join('');
+let activeAlert = -1;
+function showAlert(i) {
+  activeAlert = i;
+  [...netList.querySelectorAll('button')].forEach((b, k) => b.classList.toggle('on', k === i));
+  netDetail.textContent = i >= 0 ? NET.alerts[i].text : '';
+  netDetail.hidden = i < 0;
+}
+function setXray(on) {
+  xray = on;
+  NET.xray.visible = on;
+  for (const m of GHOST) {
+    const s = m.userData.solid;
+    m.transparent = on ? true : s.transparent;
+    m.opacity = on ? 0.16 : s.opacity;
+    m.depthWrite = on ? false : s.depthWrite;
+    if (m.userData.ink) m.userData.ink.uBackInk.value = on ? 0 : s.backInk;
+    m.needsUpdate = true;
+  }
+  document.body.classList.toggle('xray', on);
+  $('btnNet').setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (!on) showAlert(-1);
+}
+function jumpTo(i) {
+  const v = NET.alerts[i].view;
+  if (mode === 'plan' || mode === 'toPlan') { flight = null; }
+  me.x = v.x; me.z = v.z; me.yaw = v.yaw; me.pitch = v.pitch; goal = null;
+  setMode('walk');
+  startReveal(roomAt(me.x, me.z), me.x, me.z);
+  showAlert(i);
+}
+$('btnNet').addEventListener('click', () => setXray(!xray));
+$('netFold').addEventListener('click', () => {
+  const min = netPanel.classList.toggle('min');
+  $('netFold').textContent = min ? 'Afficher' : 'Réduire';
+  $('netFold').setAttribute('aria-expanded', min ? 'false' : 'true');
+});
+netList.addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) jumpTo(+b.dataset.i); });
+addEventListener('keydown', (e) => { if (e.code === 'KeyR' && (mode === 'walk' || mode === 'plan')) setXray(!xray); });
+
 // two thumb sticks on touch screens: left walks, right looks around. Each follows its own finger.
 function thumbStick(el, state) {
   const knob = el.querySelector('.knob');
@@ -484,6 +538,10 @@ function frame(dt) {
     if (t >= 1) setMode(flight.dir > 0 ? 'plan' : 'walk');
   } else if (mode === 'plan') apply(planPath(1));
   updateReveal();
+  if (xray) {
+    const far = Math.max(1, (2 * camera.position.y * Math.tan((camera.fov * D2R) / 2)) / 9);
+    NET.alertSprites.forEach((s, i) => s.scale.setScalar((i === activeAlert ? 0.34 : 0.26) * far * (1 + 0.1 * Math.sin(clock * 4 + i))));
+  }
   renderer.render(scene, camera);
 }
 
@@ -507,7 +565,7 @@ if (CAPTURE) {
     plan(t, dir = 1) { if (!flight || flight.dir !== dir) flight = { t0: clock, dir }; setMode(dir > 0 ? 'toPlan' : 'toWalk'); clock = flight.t0 + t * 2.6; frame(0); },
     set clock(v) { clock = v; }, get clock() { return clock; },
     state: () => ({ mode, pose: { ...pose }, room: roomAt(me.x, me.z), errors: errors.slice(), calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
-    walkable, roomAt,
+    walkable, roomAt, xray: (on) => { setXray(on); frame(0); }, jump: (i) => { jumpTo(i); frame(0); },
   };
   window.__ready = true;
 } else {

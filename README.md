@@ -6,6 +6,7 @@ Le plan s'ouvre comme une feuille d'architecte. On clique sur « Entrer », les 
 
 - Rendu temps réel : three.js 0.170, fichiers statiques, sans étape de build.
 - `?walk` dans l'URL saute l'introduction et démarre sur le palier.
+- Bouton **Réseaux** (touche R) : mode rayons X avec l'électricité, l'eau froide, l'eau chaude et les évacuations, et 3 points à vérifier. **Ce réseau est fictif**, dessiné pour la démonstration : il ne correspond à aucun plan technique réel.
 
 ## Crédits
 

@@ -62,6 +62,7 @@ export function inkAware(material, { backInk = false, glass = false } = {}) {
     material.polygonOffsetUnits = 1;
   }
   const own = { uBackInk: { value: backInk ? 1 : 0 }, uGlass: { value: glass ? 1 : 0 } };
+  material.userData.ink = own;
   material.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U, own);
     sh.vertexShader = 'varying vec3 vWp;\nvarying vec3 vWn;\n' + sh.vertexShader.replace(
