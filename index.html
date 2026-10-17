@@ -1,0 +1,111 @@
+<meta charset="utf-8">
+<title>Visite Appartement B</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Appartement B, 3 pièces, 6e étage. Le plan devient l'appartement : entrez et visitez librement.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
+<style>
+  :root { --paper: #f1eee6; --ink: #17171a; --muted: #6b665d; --accent: #b8452a; }
+  * { box-sizing: border-box; }
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--paper); color: var(--ink); overscroll-behavior: none;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; -webkit-tap-highlight-color: transparent; }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  .ui { position: fixed; z-index: 2; pointer-events: none; }
+  .ui > * { pointer-events: auto; }
+  button { font: inherit; cursor: pointer; }
+
+  #hero { left: clamp(16px, 5vw, 64px); top: 50%; transform: translateY(-50%); max-width: 430px; transition: opacity .6s, transform .6s; }
+  #hero .credits { font-size: 10px; line-height: 1.5; color: var(--muted); margin: 18px 0 0; max-width: 46ch; }
+  #hero .k { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 18px; }
+  #hero h1 { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; font-size: clamp(42px, 6vw, 76px); line-height: .98; margin: 0 0 18px; }
+  #hero h1 em { color: var(--accent); }
+  #hero p { font-size: 13px; line-height: 1.6; color: #3b3832; margin: 0 0 26px; max-width: 34ch; }
+  .btn { border: 1px solid var(--ink); background: var(--ink); color: var(--paper); padding: 13px 20px; border-radius: 999px; font-size: 13px; letter-spacing: .04em; }
+  .btn.ghost { background: rgba(241,238,230,.86); color: var(--ink); backdrop-filter: blur(6px); }
+  body:not([data-mode="sheet"]) #hero { opacity: 0; transform: translateY(-46%); pointer-events: none; }
+  body:not([data-mode="sheet"]) #hero * { pointer-events: none; }
+
+  #top { top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); display: flex; justify-content: space-between; align-items: center; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+  #top .mark { background: rgba(241,238,230,.86); padding: 7px 11px; border-radius: 999px; backdrop-filter: blur(6px); }
+  #btnPlan { opacity: 0; transition: opacity .4s; }
+  body[data-mode="walk"] #btnPlan, body[data-mode="plan"] #btnPlan { opacity: 1; }
+  body[data-mode="plan"] #btnPlan::after { content: " · reprendre"; }
+
+  #room { left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translate(-50%, 12px); opacity: 0; transition: .5s;
+    background: rgba(241,238,230,.9); backdrop-filter: blur(6px); border-radius: 14px; padding: 10px 18px; text-align: center; min-width: 170px; }
+  #room.on { opacity: 1; transform: translate(-50%, 0); }
+  body:not([data-mode="walk"]) #room { opacity: 0; }
+  #roomName { font-family: "Instrument Serif", Georgia, serif; font-size: 26px; line-height: 1; }
+  #roomArea { font-size: 12px; color: var(--accent); margin-top: 4px; }
+
+  #help { right: 16px; bottom: max(22px, env(safe-area-inset-bottom)); font-size: 11.5px; line-height: 1.7; color: #3b3832; text-align: right;
+    background: rgba(241,238,230,.86); padding: 9px 12px; border-radius: 10px; transition: opacity 1s; opacity: 0; }
+  body[data-mode="walk"] #help { opacity: 1; }
+  #help.gone { opacity: 0 !important; }
+  #help .touch { display: none; }
+  @media (pointer: coarse), (hover: none) { #help .mouse { display: none; } #help .touch { display: inline; } #help { bottom: auto; top: calc(64px + env(safe-area-inset-top, 0px)); } }
+
+  .stick { position: fixed; bottom: calc(26px + env(safe-area-inset-bottom, 0px)); width: 124px; height: 124px; border-radius: 50%;
+    border: 1px solid rgba(23,23,26,.35); background: rgba(241,238,230,.5); backdrop-filter: blur(4px); display: none; touch-action: none; z-index: 3; }
+  #stick { left: max(22px, env(safe-area-inset-left, 0px)); }
+  #stickLook { right: max(22px, env(safe-area-inset-right, 0px)); }
+  .stick .knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px; border-radius: 50%; background: rgba(23,23,26,.72); pointer-events: none; transition: transform .12s; }
+  .stick.held .knob { transition: none; }
+  .stick span { position: absolute; left: 0; right: 0; top: -20px; text-align: center; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); text-shadow: 0 0 6px var(--paper); }
+  @media (pointer: coarse), (hover: none) { body[data-mode="walk"] .stick { display: block; } body[data-mode="walk"] #room { bottom: calc(164px + env(safe-area-inset-bottom, 0px)); } }
+
+  #loading { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; background: var(--paper); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); transition: opacity .8s; }
+  #loading.done { opacity: 0; pointer-events: none; }
+  #nogl { position: fixed; inset: 0; z-index: 6; display: none; place-items: center; text-align: center; padding: 24px; background: var(--paper); }
+
+  @media (max-width: 760px) {
+    #hero { top: auto; bottom: max(26px, env(safe-area-inset-bottom)); transform: none; left: 16px; right: 16px; max-width: none;
+      background: rgba(241,238,230,.9); padding: 16px; border-radius: 14px; backdrop-filter: blur(6px); }
+    #hero h1 { font-size: 40px; margin-bottom: 10px; }
+    #hero p { margin-bottom: 16px; }
+    #hero .credits { font-size: 10px; line-height: 1.5; color: var(--muted); margin: 18px 0 0; max-width: 46ch; }
+  #hero .k { margin-bottom: 10px; }
+  }
+</style>
+<canvas id="gl"></canvas>
+<script>document.documentElement.lang = 'fr'; document.body.dataset.mode = 'sheet';</script>
+
+<header id="top" class="ui">
+  <span class="mark">Appartement B · 6<sup>e</sup> étage</span>
+  <button id="btnPlan" class="btn ghost">Plan</button>
+</header>
+
+<section id="hero" class="ui">
+  <p class="k">Plan A-B · 3 pièces · 92,66 m²</p>
+  <h1>Ce plan est <em>l'appartement.</em></h1>
+  <p>Le dessin n'est pas une image : c'est la maquette coupée à 1,20 m. Entrez par l'escalier, puis visitez librement. Chaque pièce prend ses matières quand vous y entrez.</p>
+  <button id="btnEnter" class="btn">Entrer dans l'appartement</button>
+  <p class="credits">Matières : scans Poly Haven (CC0). Mobilier 3D : Khronos glTF Sample Assets, Eric Chadwick (CC BY 4.0) et Microsoft (CC0) ; Poly Haven (CC0). Œuvres du domaine public : F. Picabia, H. Matisse, Caravage, J. M. W. Turner.</p>
+</section>
+
+<div id="room" class="ui"><div id="roomName"></div><div id="roomArea"></div></div>
+
+<div id="help" class="ui">
+  <span class="mouse">Glisser pour regarder<br>ZQSD / WASD ou flèches pour marcher<br>Double-clic : aller à cet endroit · P : plan</span>
+  <span class="touch">Glisser pour regarder<br>Joystick gauche : marcher · droit : regarder</span>
+</div>
+
+<div id="stick" class="stick"><span>Marcher</span><div class="knob"></div></div>
+<div id="stickLook" class="stick"><span>Regarder</span><div class="knob"></div></div>
+<div id="loading">Dessin du plan…</div>
+<div id="nogl"><p>Cette visite dessine l'appartement en temps réel et demande WebGL 2.</p></div>
+
+<script>
+  (function () {
+    var c = document.createElement('canvas');
+    if (!c.getContext('webgl2')) { document.getElementById('nogl').style.display = 'grid'; }
+  })();
+</script>
+<script type="module" src="js/main.js"></script>
